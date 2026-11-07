@@ -1,14 +1,24 @@
 #include "storage.h"
 
+#include <functional>
+
+Storage::Storage(size_t shards) : shards_(shards == 0 ? 1 : shards) {}
+
+Storage::Shard& Storage::shard_for(const std::string& key) const {
+    return shards_[std::hash<std::string>{}(key) % shards_.size()];
+}
+
 void Storage::set(const std::string& key, const std::string& value) {
-    std::lock_guard<std::mutex> lock(mutex_);  // released automatically at the end of the function
-    map_[key] = value;
+    Shard& shard = shard_for(key);
+    std::lock_guard<std::mutex> lock(shard.mutex);  // released automatically at the end of the function
+    shard.map[key] = value;
 }
 
 std::optional<std::string> Storage::get(const std::string& key) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    auto it = map_.find(key);
-    if (it == map_.end()) {
+    Shard& shard = shard_for(key);
+    std::lock_guard<std::mutex> lock(shard.mutex);
+    auto it = shard.map.find(key);
+    if (it == shard.map.end()) {
         return std::nullopt;
     }
     // Returns a COPY of the value. Returning a reference into the map would
@@ -17,7 +27,8 @@ std::optional<std::string> Storage::get(const std::string& key) const {
 }
 
 bool Storage::remove(const std::string& key) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    Shard& shard = shard_for(key);
+    std::lock_guard<std::mutex> lock(shard.mutex);
     // erase(key) returns how many elements it removed: 1 or 0.
-    return map_.erase(key) == 1;
+    return shard.map.erase(key) == 1;
 }

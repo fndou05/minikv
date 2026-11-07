@@ -3,18 +3,20 @@
 //   c++ -std=c++17 -g -fsanitize=thread -Isrc tests/storage_stress.cpp \
 //       src/storage.cpp -o storage_stress -pthread && ./storage_stress
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "storage.h"
 
-int main() {
+int main(int argc, char** argv) {
     const int threads = 8;
     const int keys_per_thread = 500;
     const int rounds = 200;
 
-    Storage storage;
+    // optional argument: number of lock shards (default 1 = global lock)
+    Storage storage(argc > 1 ? static_cast<size_t>(std::atoi(argv[1])) : 1);
     std::vector<std::thread> workers;
     int failures = 0;
     std::vector<int> thread_failures(threads, 0);

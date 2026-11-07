@@ -11,13 +11,15 @@
 #include "thread_pool.h"
 
 static void usage() {
-    std::fprintf(stderr, "usage: minikv [port] [single | thread | pool [workers]]\n");
+    std::fprintf(stderr,
+                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards]\n");
 }
 
 int main(int argc, char** argv) {
     int port = (argc > 1) ? std::atoi(argv[1]) : 7379;
     std::string mode = (argc > 2) ? argv[2] : "single";
     size_t pool_workers = (argc > 3) ? static_cast<size_t>(std::atoi(argv[3])) : 16;
+    size_t shards = (argc > 4) ? static_cast<size_t>(std::atoi(argv[4])) : 1;
     if (mode != "single" && mode != "thread" && mode != "pool") {
         usage();
         return 1;
@@ -32,10 +34,11 @@ int main(int argc, char** argv) {
     if (listen_fd < 0) {
         return 1;
     }
-    std::printf("minikv listening on 127.0.0.1:%d (mode: %s)\n", port, mode.c_str());
+    std::printf("minikv listening on 127.0.0.1:%d (mode: %s, lock shards: %zu)\n", port,
+                mode.c_str(), shards);
     std::fflush(stdout);
 
-    Storage storage;
+    Storage storage(shards);
     ThreadPool pool(mode == "pool" ? pool_workers : 0, storage);
 
     while (true) {
