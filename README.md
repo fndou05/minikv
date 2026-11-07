@@ -8,25 +8,16 @@ This is a work in progress
 
 ## Status
 
-Stages 1 to 3 work: the server supports SET, GET, and DELETE, serves many
-clients at once (thread-per-connection or a fixed thread pool), and the storage
-is thread-safe (a mutex per shard; one shard is a single global lock). Stage 4
-(persistence) is not built yet, so **all data is lost when the server stops**.
-Anything not described in the sections below is still planned.
+Stages 1 to 4 are built and tested:
 
-I've only built and run this on macOS (Apple Silicon). The code is plain POSIX,
-but I haven't tested it on Linux yet.
+1. Single-threaded TCP server (SET / GET / DELETE)
+2. Many clients at once: thread-per-connection or a fixed thread pool
+3. Thread-safe storage: a mutex per shard (1 shard = one global lock)
+4. Persistence: an append-only log that is replayed on startup
 
-## Plan
-
-I'm building this in stages and measuring requests per second after each one:
-
-1. Single-threaded TCP server
-2. Multiple clients (thread-per-connection vs. thread pool, maybe epoll)
-3. Thread-safe storage (one global lock vs. finer-grained locking)
-4. Persistence with an append-only log
-
-If there's time after that: key expiration.
+Not built: key expiration, epoll, and log compaction. I've only built and run
+this on macOS (Apple Silicon). The code is plain POSIX, but I haven't tested it
+on Linux yet.
 
 ## Protocol
 
@@ -53,7 +44,7 @@ build type is Release (`-O2`).
 ```
 cmake -S . -B build
 cmake --build build
-./build/minikv [port] [single | thread | pool] [pool workers] [lock shards]
+./build/minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file]
 ```
 
 - `single`: one client at a time (default)
@@ -69,10 +60,36 @@ other when their keys land in the same piece. 1 shard means one global lock.
 The server listens on `127.0.0.1` only (there's no authentication). Try it with
 `nc 127.0.0.1 7379` and type commands.
 
+## Persistence
+
+Start the server with a log file as the 5th argument to turn it on:
+
+```
+./build/minikv 7379 pool 16 64 minikv.log
+```
+
+Every `SET` and every `DELETE` that actually removed something is appended to
+the file as one line, in the same text format as the protocol. On startup the
+server replays the file through the normal command parser before it starts
+listening. Without a log file argument, nothing is saved.
+
+What it does and doesn't promise:
+
+- Each write is flushed to the OS, so the data survives the server process being
+  killed (I test this with `kill -9`). There is no `fsync`, so a power cut or OS
+  crash can lose the most recent writes.
+- If the server dies in the middle of a write, the last line can be cut off. On
+  startup a line without its `\n` is ignored and trimmed from the file.
+- The log only grows. There's no compaction, so overwriting the same key
+  repeatedly keeps adding lines.
+- Every write takes one extra lock and a `write` call, which costs throughput
+  (numbers below).
+
 ## Tests
 
 `tests/test_server.py` starts the server and checks replies over a real socket,
-including a command split across sends and many commands in one send.
+including a command split across sends and many commands in one send, and
+restarting the server after `kill -9` to check the log (including a torn last line).
 
 ```
 python3 tests/test_server.py build/minikv [single | thread | pool]
@@ -93,6 +110,7 @@ c++ -std=c++17 -g -fsanitize=thread -Isrc tests/storage_stress.cpp src/storage.c
 - `src/protocol.*`: turns one command line into a reply
 - `src/server.*`: sockets, buffering partial reads, sending replies
 - `src/thread_pool.*`: fixed worker threads fed by a queue of client sockets
+- `src/log.*`: replays the append-only log on startup
 - `src/main.cpp`: accept loop and mode selection
 - `bench/`: load generator (`bench.cpp`), run script, and raw results
 - `tests/`: socket test script and storage stress test
@@ -145,3 +163,15 @@ That makes sense: each operation only holds the lock for a hash-map lookup,
 which is tiny next to the cost of the `recv`/`send` system calls, so the global
 lock isn't the bottleneck at this scale. I'd expect sharding to matter more
 with more cores doing less I/O per request, but I haven't measured that.
+
+**Cost of the append-only log** (pool, 16 clients, 64 shards, 3 rounds
+alternating without and with the log, median requests/sec):
+
+| | median requests/sec | median p99 latency |
+|---|---|---|
+| no log | 232,278 | 139.2 us |
+| log (flush on every write) | 205,784 | 255.9 us |
+
+So the log cost about 11% of throughput here, and the p99 got worse. Only 3
+rounds, and runs varied by 10% or more, so this is a rough number. I haven't
+tried batching writes or calling `fsync`.
