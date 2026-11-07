@@ -8,7 +8,7 @@ persistence work. Only the standard library and POSIX are used.
 
 ## Status
 
-Version 1.0.0. All four stages are built, tested, and benchmarked:
+Version 1.1.0. All four stages are built, tested, and benchmarked:
 
 1. Single-threaded TCP server (SET / GET / DELETE)
 2. Many clients at once: thread-per-connection or a fixed thread pool
@@ -19,7 +19,7 @@ Tested on Linux (Ubuntu, with both g++ and clang++) by GitHub Actions on every
 push, and on macOS (Apple Silicon) by hand. The benchmark numbers below are from
 the Mac only; I haven't benchmarked on Linux.
 
-Not built: key expiration, epoll, and log compaction (see "Limitations").
+Not built: key expiration, epoll, group commit, and log compaction (see "Limitations").
 
 ## How it works
 
@@ -63,8 +63,9 @@ Design decisions:
   workers only N clients are served at once. Thread-per-connection has no such
   limit but creates a thread per client. Fixing this properly means an event
   loop (epoll), which I haven't built.
-- The log is flushed to the OS on every write but never `fsync`ed, so it survives
-  the server process being killed but not a power cut. It also never shrinks.
+- Every `fsync` waits for the disk while holding the log lock, so durable writes
+  are serialized. Real databases batch several writes into one `fsync` (group
+  commit); I haven't. The log also never shrinks.
 - No authentication (it only listens on `127.0.0.1`), no TLS, no key expiration.
 - Values can't contain a newline, because the protocol is line based.
 
@@ -93,7 +94,7 @@ build type is Release (`-O2`).
 ```
 cmake -S . -B build
 cmake --build build
-./build/minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file]
+./build/minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file] [fsync]
 ```
 
 - `single`: one client at a time (default)
@@ -124,9 +125,14 @@ listening. Without a log file argument, nothing is saved.
 
 What it does and doesn't promise:
 
-- Each write is flushed to the OS, so the data survives the server process being
-  killed (I test this with `kill -9`). There is no `fsync`, so a power cut or OS
-  crash can lose the most recent writes.
+- By default each write is flushed to the OS, so the data survives the server
+  process being killed (I test this with `kill -9`). A power cut or OS crash can
+  still lose the most recent writes.
+- Add `fsync` as the 6th argument (`./build/minikv 7379 pool 16 64 minikv.log fsync`)
+  to also call `fsync` after every write, so a change is on disk before the
+  client gets `OK`. This is much slower (numbers below). I can't test a real
+  power cut, so the tests only check that the option works and recovery is
+  unchanged.
 - If the server dies in the middle of a write, the last line can be cut off. On
   startup a line without its `\n` is ignored and trimmed from the file.
 - The log only grows. There's no compaction, so overwriting the same key
@@ -234,3 +240,52 @@ alternating without and with the log, median requests/sec):
 So the log cost about 11% of throughput here, and the p99 got worse. Only 3
 rounds, and runs varied by 10% or more, so this is a rough number. I haven't
 tried batching writes or calling `fsync`.
+
+### More measurements
+
+Same machine and build as above. Raw output is in `bench/results/`.
+
+**Scaling with the number of clients** (thread-per-connection, 64 shards, same
+80/20 workload, 3 runs each, median):
+
+| clients | requests/sec | p50 latency | p99 latency |
+|---|---|---|---|
+| 1 | 73,810 | 13.1 us | 21.2 us |
+| 2 | 122,312 | 15.9 us | 27.1 us |
+| 4 | 183,558 | 16.6 us | 44.0 us |
+| 8 | 236,011 | 25.5 us | 70.6 us |
+| 16 | 259,817 | 47.9 us | 128.1 us |
+| 32 | 206,147 | 179.5 us | 494.5 us |
+| 64 | 181,532 | 387.8 us | 573.8 us |
+
+Throughput rises to a peak at 16 clients (3.5x the single-client rate) and then
+drops while latency climbs. The machine has 12 cores and the load generator runs
+on it too, so past about 16 clients the server threads and the client threads
+are fighting for cores. I believe that's the cause, but I didn't test it
+separately (for example by pinning the two sides to different cores).
+
+**What durability costs** (pool, 16 clients, 64 shards, 3 rounds alternating the
+variants, median of each):
+
+| log | requests/sec | p99 latency |
+|---|---|---|
+| none | 205,929 | 140 us |
+| flush to OS (default) | 188,751 | 247 us |
+| flush + `fsync()` | 156,683 | 646 us |
+| flush + `F_FULLFSYNC` (one-off, see below) | 2,839 | 35,953 us |
+
+On macOS, `fsync()` only pushes data to the drive's own cache, which is why it
+looks cheap. Forcing the drive to really write it (`F_FULLFSYNC`) dropped
+throughput by about 70x. I measured that with a throwaway build, not the
+committed code (`bench/results/fullfsync-macos.txt`), and it's a single set of
+3 runs. The takeaway is that "survives a power cut" is expensive, and that's why
+databases batch writes before syncing. The no-log runs varied from 189k to 235k
+between rounds, so differences under about 10% in this table aren't meaningful.
+
+**Restart time:** replaying a 53 MB log of 467,306 commands (10,000 distinct
+keys, lots of overwrites) took 306 to 326 ms over 3 runs.
+
+**The pool limit, demonstrated** (`python3 bench/pool_limit.py build/minikv`):
+with a 4-worker pool and 8 clients connected at once, 4 clients got replies
+within 2 seconds and 4 did not. Once the first 4 disconnected, the other 4 were
+served. That's the blocking-I/O limit described under Limitations.
