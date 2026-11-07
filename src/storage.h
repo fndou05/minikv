@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -21,5 +22,8 @@ public:
     bool remove(const std::string& key);
 
 private:
+    // One lock for the whole table: every operation takes it, so only one
+    // thread touches the map at a time. `mutable` so const get() can lock.
+    mutable std::mutex mutex_;
     std::unordered_map<std::string, std::string> map_;
 };
