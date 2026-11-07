@@ -101,7 +101,23 @@ def run_tests():
     check("large value set", ask(s, "SET big " + big), "OK")
     check("large value get", ask(s, "GET big"), big)
 
-    print("multiple clients (one after another in stage 1)")
+    print("several clients at the same time")
+    # Three connections open together, taking turns. A server that serves one
+    # client at a time never answers the second connection while the first is
+    # open, so this only passes in thread / pool mode.
+    if "single" not in sys.argv[2:] and len(sys.argv) > 2:
+        a, b, c = connect(), connect(), connect()
+        check("client a", ask(a, "SET ca 1"), "OK")
+        check("client b", ask(b, "SET cb 2"), "OK")
+        check("client c sees a's data", ask(c, "GET ca"), "1")
+        check("client a sees b's data", ask(a, "GET cb"), "2")
+        a.close()
+        b.close()
+        c.close()
+    else:
+        print("  (skipped in single mode)")
+
+    print("reconnect")
     s.close()
     s2 = connect()
     check("data survives reconnect", ask(s2, "GET big") == "x" * 50000, True)
