@@ -1,0 +1,33 @@
+# interleaved: alternating 1 shard and 64 shards, 5 rounds, mode=pool (16 workers), clients=16, 10s per run
+# 2026-11-06 21:58  commit 920489a
+# Apple M2 Pro, 12 cores, Darwin 23.6.0; Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## round=1 shards=1
+clients=16 requests=2358267 errors=0 seconds=10.00
+requests/sec=235824  latency_us p50=50.4 p99=144.7 max=30775.0
+## round=1 shards=64
+clients=16 requests=2455372 errors=0 seconds=10.00
+requests/sec=245531  latency_us p50=48.6 p99=132.8 max=33296.2
+## round=2 shards=1
+clients=16 requests=2129652 errors=0 seconds=10.00
+requests/sec=212962  latency_us p50=57.8 p99=137.2 max=39383.5
+## round=2 shards=64
+clients=16 requests=2544267 errors=0 seconds=10.00
+requests/sec=254424  latency_us p50=45.4 p99=137.2 max=39883.9
+## round=3 shards=1
+clients=16 requests=2277454 errors=0 seconds=10.00
+requests/sec=227742  latency_us p50=49.5 p99=169.0 max=33845.5
+## round=3 shards=64
+clients=16 requests=2546521 errors=0 seconds=10.00
+requests/sec=254649  latency_us p50=47.6 p99=134.2 max=49899.5
+## round=4 shards=1
+clients=16 requests=2273796 errors=0 seconds=10.00
+requests/sec=227377  latency_us p50=49.8 p99=204.3 max=29409.6
+## round=4 shards=64
+clients=16 requests=2492147 errors=0 seconds=10.00
+requests/sec=249210  latency_us p50=46.9 p99=145.4 max=50149.2
+## round=5 shards=1
+clients=16 requests=2374920 errors=0 seconds=10.00
+requests/sec=237489  latency_us p50=49.4 p99=174.3 max=69397.3
+## round=5 shards=64
+clients=16 requests=2170567 errors=0 seconds=10.00
+requests/sec=217052  latency_us p50=53.9 p99=133.7 max=49492.7

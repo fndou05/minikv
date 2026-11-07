@@ -1,0 +1,21 @@
+# shards-64  2026-11-06 21:57  commit 920489a
+# Apple M2 Pro, 12 cores, Darwin 23.6.0
+# Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## mode=thread clients=16 run=1
+clients=16 requests=2336156 errors=0 seconds=10.00
+requests/sec=233613  latency_us p50=50.0 p99=146.3 max=57365.4
+## mode=thread clients=16 run=2
+clients=16 requests=2360779 errors=0 seconds=10.00
+requests/sec=236075  latency_us p50=49.1 p99=134.8 max=30543.2
+## mode=thread clients=16 run=3
+clients=16 requests=2158315 errors=0 seconds=10.00
+requests/sec=215829  latency_us p50=52.5 p99=137.1 max=38544.8
+## mode=pool clients=16 run=1
+clients=16 requests=2591336 errors=0 seconds=10.00
+requests/sec=259130  latency_us p50=40.5 p99=145.6 max=49114.6
+## mode=pool clients=16 run=2
+clients=16 requests=2521835 errors=0 seconds=10.00
+requests/sec=252180  latency_us p50=44.3 p99=144.8 max=58313.6
+## mode=pool clients=16 run=3
+clients=16 requests=2768702 errors=0 seconds=10.00
+requests/sec=276867  latency_us p50=30.5 p99=160.2 max=66067.2
