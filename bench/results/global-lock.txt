@@ -1,0 +1,48 @@
+# global-lock  2026-11-06 21:52  commit bcb4fd3
+# Apple M2 Pro, 12 cores, Darwin 23.6.0
+# Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## mode=single clients=1 run=1
+clients=1 requests=732680 errors=0 seconds=10.00
+requests/sec=73268  latency_us p50=13.4 p99=19.7 max=762.8
+## mode=single clients=1 run=2
+clients=1 requests=738779 errors=0 seconds=10.00
+requests/sec=73878  latency_us p50=13.3 p99=19.7 max=2329.5
+## mode=single clients=1 run=3
+clients=1 requests=744891 errors=0 seconds=10.00
+requests/sec=74489  latency_us p50=13.2 p99=19.5 max=1022.2
+## mode=thread clients=1 run=1
+clients=1 requests=731797 errors=0 seconds=10.00
+requests/sec=73180  latency_us p50=13.5 p99=20.0 max=509.0
+## mode=thread clients=1 run=2
+clients=1 requests=732479 errors=0 seconds=10.00
+requests/sec=73248  latency_us p50=13.3 p99=20.5 max=2554.7
+## mode=thread clients=1 run=3
+clients=1 requests=747681 errors=0 seconds=10.00
+requests/sec=74768  latency_us p50=13.1 p99=19.5 max=1068.8
+## mode=thread clients=16 run=1
+clients=16 requests=2197211 errors=0 seconds=10.00
+requests/sec=219718  latency_us p50=55.2 p99=144.8 max=40519.5
+## mode=thread clients=16 run=2
+clients=16 requests=2782392 errors=0 seconds=10.00
+requests/sec=278236  latency_us p50=47.0 p99=126.0 max=31936.0
+## mode=thread clients=16 run=3
+clients=16 requests=2676137 errors=0 seconds=10.00
+requests/sec=267610  latency_us p50=46.7 p99=166.6 max=40148.3
+## mode=pool clients=1 run=1
+clients=1 requests=738558 errors=0 seconds=10.00
+requests/sec=73856  latency_us p50=13.4 p99=19.7 max=269.2
+## mode=pool clients=1 run=2
+clients=1 requests=740284 errors=0 seconds=10.00
+requests/sec=74028  latency_us p50=13.3 p99=19.4 max=130.2
+## mode=pool clients=1 run=3
+clients=1 requests=737296 errors=0 seconds=10.00
+requests/sec=73729  latency_us p50=13.4 p99=20.0 max=1067.8
+## mode=pool clients=16 run=1
+clients=16 requests=2429429 errors=0 seconds=10.00
+requests/sec=242940  latency_us p50=48.6 p99=150.8 max=47529.7
+## mode=pool clients=16 run=2
+clients=16 requests=2553394 errors=0 seconds=10.00
+requests/sec=255336  latency_us p50=44.1 p99=156.9 max=38865.0
+## mode=pool clients=16 run=3
+clients=16 requests=2328275 errors=0 seconds=10.00
+requests/sec=232824  latency_us p50=50.4 p99=138.2 max=29317.0
