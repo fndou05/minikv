@@ -1,23 +1,72 @@
 # minikv
 
-A multithreaded in-memory key-value store written in C++, accessed over TCP. 
-It's a small Redis-style server I'm building to learn how sockets, concurrency, 
-and persistence work.
+[![ci](https://github.com/fndou05/minikv/actions/workflows/ci.yml/badge.svg)](https://github.com/fndou05/minikv/actions/workflows/ci.yml)
 
-This is a work in progress
+A multithreaded in-memory key-value store written in C++17, accessed over TCP.
+It's a small Redis-style server I built to learn how sockets, concurrency, and
+persistence work. Only the standard library and POSIX are used.
 
 ## Status
 
-Stages 1 to 4 are built and tested:
+Version 1.0.0. All four stages are built, tested, and benchmarked:
 
 1. Single-threaded TCP server (SET / GET / DELETE)
 2. Many clients at once: thread-per-connection or a fixed thread pool
 3. Thread-safe storage: a mutex per shard (1 shard = one global lock)
 4. Persistence: an append-only log that is replayed on startup
 
-Not built: key expiration, epoll, and log compaction. I've only built and run
-this on macOS (Apple Silicon). The code is plain POSIX, but I haven't tested it
-on Linux yet.
+Tested on Linux (Ubuntu, with both g++ and clang++) by GitHub Actions on every
+push, and on macOS (Apple Silicon) by hand. The benchmark numbers below are from
+the Mac only; I haven't benchmarked on Linux.
+
+Not built: key expiration, epoll, and log compaction (see "Limitations").
+
+## How it works
+
+```
+ client ──TCP──▶ accept loop (main.cpp)
+                   │  single: serve inline │ thread: new thread │ pool: queue ─▶ workers
+                   ▼
+              serve_client (server.cpp)
+                 recv ─▶ buffer ─▶ split on '\n' ─▶ handle_command (protocol.cpp)
+                                                          │
+                                                          ▼
+                                                  Storage (storage.cpp)
+                                       hash(key) picks a shard ─▶ lock that shard's mutex
+                                          ├─ unordered_map get/set/erase
+                                          └─ append "SET k v" / "DELETE k" to the log
+                                                          │
+                                  on startup: replay_log (log.cpp) feeds the log back
+                                  through handle_command before the socket opens
+```
+
+Design decisions:
+
+- **Storage hides the map and the locking.** The network code only calls
+  `set`, `get`, and `remove`, so locking and logging were added without touching
+  any socket code.
+- **Line framing.** TCP is a byte stream, so each connection has a buffer. A
+  command only runs once its `\n` has arrived, and several commands in one read
+  are all run, in order.
+- **`get` returns a copy.** A reference into the map could be invalidated by
+  another thread as soon as the lock is released.
+- **The log reuses the protocol.** Log lines are the same text as client commands,
+  so replay is just running them through the same parser.
+- **Log order matches memory order.** The log is written while the key's shard
+  lock is held, so for any one key the log replays in the order it was applied.
+- **Crash safety for the log.** A half-written last line is ignored and trimmed
+  on startup so the next write doesn't get glued onto it.
+
+## Limitations
+
+- In `pool` mode a worker serves one client until it disconnects, so with N
+  workers only N clients are served at once. Thread-per-connection has no such
+  limit but creates a thread per client. Fixing this properly means an event
+  loop (epoll), which I haven't built.
+- The log is flushed to the OS on every write but never `fsync`ed, so it survives
+  the server process being killed but not a power cut. It also never shrinks.
+- No authentication (it only listens on `127.0.0.1`), no TLS, no key expiration.
+- Values can't contain a newline, because the protocol is line based.
 
 ## Protocol
 
@@ -91,6 +140,15 @@ What it does and doesn't promise:
 including a command split across sends and many commands in one send, and
 restarting the server after `kill -9` to check the log (including a torn last line).
 
+To run everything (the socket tests in all three modes plus the stress test):
+
+```
+ctest --test-dir build --output-on-failure
+```
+
+The same suite runs on Ubuntu in CI (`.github/workflows/ci.yml`), plus a
+ThreadSanitizer run of the stress test.
+
 ```
 python3 tests/test_server.py build/minikv [single | thread | pool]
 ```
@@ -114,6 +172,7 @@ c++ -std=c++17 -g -fsanitize=thread -Isrc tests/storage_stress.cpp src/storage.c
 - `src/main.cpp`: accept loop and mode selection
 - `bench/`: load generator (`bench.cpp`), run script, and raw results
 - `tests/`: socket test script and storage stress test
+- `.github/workflows/ci.yml`: Linux CI
 
 ## Benchmarks
 
