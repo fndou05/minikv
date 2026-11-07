@@ -21,6 +21,22 @@ add_executable(minikv
 target_compile_options(minikv PRIVATE -Wall -Wextra)
 target_link_libraries(minikv PRIVATE Threads::Threads)
 
+# Tests: run them all with `ctest --output-on-failure` from the build folder.
+# They share one TCP port, so ctest must run them one at a time (its default).
+enable_testing()
+
+add_executable(storage_stress tests/storage_stress.cpp src/storage.cpp)
+target_compile_options(storage_stress PRIVATE -Wall -Wextra)
+target_include_directories(storage_stress PRIVATE src)
+target_link_libraries(storage_stress PRIVATE Threads::Threads)
+
+foreach(mode single thread pool)
+  add_test(NAME server_${mode}
+           COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/test_server.py $<TARGET_FILE:minikv> ${mode})
+endforeach()
+add_test(NAME storage_stress_1_shard COMMAND storage_stress 1)
+add_test(NAME storage_stress_64_shards COMMAND storage_stress 64)
+
 # Load generator used for the benchmark numbers in the README.
 add_executable(bench bench/bench.cpp)
 target_compile_options(bench PRIVATE -Wall -Wextra)

@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
