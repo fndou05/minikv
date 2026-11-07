@@ -6,13 +6,14 @@
 #include <sys/socket.h>
 #include <thread>
 
+#include "log.h"
 #include "server.h"
 #include "storage.h"
 #include "thread_pool.h"
 
 static void usage() {
     std::fprintf(stderr,
-                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards]\n");
+                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file]\n");
 }
 
 int main(int argc, char** argv) {
@@ -20,6 +21,7 @@ int main(int argc, char** argv) {
     std::string mode = (argc > 2) ? argv[2] : "single";
     size_t pool_workers = (argc > 3) ? static_cast<size_t>(std::atoi(argv[3])) : 16;
     size_t shards = (argc > 4) ? static_cast<size_t>(std::atoi(argv[4])) : 1;
+    std::string log_path = (argc > 5) ? argv[5] : "";  // empty = no persistence
     if (mode != "single" && mode != "thread" && mode != "pool") {
         usage();
         return 1;
@@ -30,6 +32,19 @@ int main(int argc, char** argv) {
     // with EPIPE and we drop that one connection.
     std::signal(SIGPIPE, SIG_IGN);
 
+    Storage storage(shards);
+    if (!log_path.empty()) {
+        // Order matters: replay first (not logged), then start logging.
+        size_t replayed = replay_log(log_path, storage);
+        if (!storage.enable_log(log_path)) {
+            std::fprintf(stderr, "cannot open log file %s\n", log_path.c_str());
+            return 1;
+        }
+        std::printf("log: %s (replayed %zu commands)\n", log_path.c_str(), replayed);
+    }
+
+    // Only start listening once the old data is loaded, so no client can see
+    // a half-restored table.
     int listen_fd = make_listen_socket(port);
     if (listen_fd < 0) {
         return 1;
@@ -38,7 +53,6 @@ int main(int argc, char** argv) {
                 mode.c_str(), shards);
     std::fflush(stdout);
 
-    Storage storage(shards);
     ThreadPool pool(mode == "pool" ? pool_workers : 0, storage);
 
     while (true) {

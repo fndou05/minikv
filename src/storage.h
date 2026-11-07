@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fstream>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -29,7 +30,17 @@ public:
     // Delete the key. Returns true if it existed, false if it didn't.
     bool remove(const std::string& key);
 
+    // From now on, append every change to this file (the append-only log).
+    // Call it AFTER replaying the old log, and before serving clients.
+    // Returns false if the file can't be opened.
+    bool enable_log(const std::string& path);
+
 private:
+    // Write one line to the log, if logging is on. Called while the key's
+    // shard lock is held, so for any one key the log order matches the order
+    // the changes were applied in memory.
+    void append_log(const std::string& line);
+
     struct Shard {
         mutable std::mutex mutex;  // mutable so const get() can lock
         std::unordered_map<std::string, std::string> map;
@@ -41,4 +52,8 @@ private:
     // mutable: shard_for() is const (get() uses it) but returns a Shard& that
     // callers modify.
     mutable std::vector<Shard> shards_;
+
+    // One log file shared by all shards, so writing to it needs its own lock.
+    std::mutex log_mutex_;
+    std::ofstream log_;
 };

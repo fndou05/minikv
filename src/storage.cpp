@@ -12,6 +12,7 @@ void Storage::set(const std::string& key, const std::string& value) {
     Shard& shard = shard_for(key);
     std::lock_guard<std::mutex> lock(shard.mutex);  // released automatically at the end of the function
     shard.map[key] = value;
+    append_log("SET " + key + " " + value);
 }
 
 std::optional<std::string> Storage::get(const std::string& key) const {
@@ -30,5 +31,26 @@ bool Storage::remove(const std::string& key) {
     Shard& shard = shard_for(key);
     std::lock_guard<std::mutex> lock(shard.mutex);
     // erase(key) returns how many elements it removed: 1 or 0.
-    return shard.map.erase(key) == 1;
+    bool existed = shard.map.erase(key) == 1;
+    if (existed) {
+        append_log("DELETE " + key);  // deleting a missing key changes nothing, so don't log it
+    }
+    return existed;
+}
+
+bool Storage::enable_log(const std::string& path) {
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    log_.open(path, std::ios::app | std::ios::binary);
+    return log_.is_open();
+}
+
+void Storage::append_log(const std::string& line) {
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    if (!log_.is_open()) {
+        return;
+    }
+    log_ << line << '\n';
+    // Hand the bytes to the OS right away, so a crash of this process doesn't
+    // lose them. (No fsync, so a power cut or OS crash still can.)
+    log_.flush();
 }
