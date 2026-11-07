@@ -45,8 +45,66 @@ def ask(s, line):
 
 def start_server(binary, extra):
     proc = subprocess.Popen([binary, str(PORT)] + extra, stdout=subprocess.PIPE)
-    proc.stdout.readline()  # wait for the "listening" line
+    for line in proc.stdout:  # wait for the "listening" line
+        if b"listening" in line:
+            break
     return proc
+
+
+def run_persistence_tests(binary):
+    import os
+    import signal
+    import tempfile
+
+    print("persistence (append-only log)")
+    log = os.path.join(tempfile.mkdtemp(), "minikv.log")
+    args = ["pool", "4", "4", log]  # mode, workers, shards, log file
+
+    # First life: write some data, then kill -9 (no clean shutdown).
+    server = start_server(binary, args)
+    s = connect()
+    ask(s, "SET keep this value stays")
+    ask(s, "SET gone temporary")
+    ask(s, "SET over first")
+    ask(s, "SET over second")
+    ask(s, "DELETE gone")
+    ask(s, "SET empty ")
+    s.close()
+    server.send_signal(signal.SIGKILL)
+    server.wait()
+
+    # Second life: everything must come back.
+    server = start_server(binary, args)
+    s = connect()
+    check("value restored", ask(s, "GET keep"), "this value stays")
+    check("deleted key stays deleted", ask(s, "GET gone"), "NOT_FOUND")
+    check("last overwrite wins", ask(s, "GET over"), "second")
+    check("empty value restored", ask(s, "GET empty"), "")
+    ask(s, "SET later added after restart")
+    s.close()
+    server.send_signal(signal.SIGKILL)
+    server.wait()
+
+    # Simulate a crash in the middle of writing a line: no trailing '\n'.
+    with open(log, "ab") as f:
+        f.write(b"SET torn this line is cut of")
+    server = start_server(binary, args)
+    s = connect()
+    check("torn last line ignored", ask(s, "GET torn"), "NOT_FOUND")
+    check("earlier data intact", ask(s, "GET later"), "added after restart")
+    ask(s, "SET fresh after torn")
+    s.close()
+    server.send_signal(signal.SIGKILL)
+    server.wait()
+
+    # The write after the torn line must not have been glued onto it.
+    server = start_server(binary, args)
+    s = connect()
+    check("write after torn line survives", ask(s, "GET fresh"), "after torn")
+    check("still no torn key", ask(s, "GET torn"), "NOT_FOUND")
+    s.close()
+    server.terminate()
+    server.wait()
 
 
 def run_tests():
@@ -158,5 +216,6 @@ if __name__ == "__main__":
     finally:
         server.terminate()
         server.wait()
+    run_persistence_tests(binary)
     print("FAILED" if failures else "ALL PASSED", f"({failures} failures)")
     sys.exit(1 if failures else 0)
