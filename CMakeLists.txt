@@ -14,5 +14,9 @@ endif()
 # Release gets exactly -O2 (CMake's default would be -O3 -DNDEBUG).
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
-add_executable(minikv src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp)
+find_package(Threads REQUIRED)
+
+add_executable(minikv
+  src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp src/thread_pool.cpp)
 target_compile_options(minikv PRIVATE -Wall -Wextra)
+target_link_libraries(minikv PRIVATE Threads::Threads)
