@@ -1,0 +1,21 @@
+# cost of the append-only log: alternating no log / log, 3 rounds, mode=pool (16 workers), 64 shards, clients=16, 10s per run
+# 2026-11-06 22:02  commit 3393459
+# Apple M2 Pro, 12 cores, Darwin 23.6.0; Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## round=1 log=no
+clients=16 requests=2478014 errors=0 seconds=10.00
+requests/sec=247798  latency_us p50=48.0 p99=139.7 max=49618.8
+## round=1 log=yes
+clients=16 requests=2049238 errors=0 seconds=10.00
+requests/sec=204921  latency_us p50=71.0 p99=182.8 max=49618.2
+## round=2 log=no
+clients=16 requests=2120203 errors=0 seconds=10.00
+requests/sec=212016  latency_us p50=58.6 p99=133.0 max=30119.3
+## round=2 log=yes
+clients=16 requests=2057871 errors=0 seconds=10.00
+requests/sec=205784  latency_us p50=60.4 p99=257.9 max=50078.7
+## round=3 log=no
+clients=16 requests=2322804 errors=0 seconds=10.00
+requests/sec=232278  latency_us p50=48.4 p99=139.2 max=49738.3
+## round=3 log=yes
+clients=16 requests=2278798 errors=0 seconds=10.00
+requests/sec=227877  latency_us p50=53.2 p99=255.9 max=48650.1
