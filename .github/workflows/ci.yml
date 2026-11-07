@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
+          cmake --build build
+
+      # Socket tests in all three modes, the persistence/crash-recovery tests,
+      # and the multi-threaded stress test (see tests/).
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      # Same stress test again, built with ThreadSanitizer, which fails the
+      # run if it detects a data race.
+      - name: ThreadSanitizer
+        run: |
+          # Newer kernels randomize memory in a way TSan can't handle.
+          sudo sysctl vm.mmap_rnd_bits=28
+          for shards in 1 4 64; do
+            ${{ matrix.compiler }} -std=c++17 -g -O1 -fsanitize=thread -Isrc \
+              tests/storage_stress.cpp src/storage.cpp -o stress_tsan -pthread
+            ./stress_tsan $shards
+          done
