@@ -107,6 +107,43 @@ def run_persistence_tests(binary, fsync=False):
     server.wait()
 
 
+def run_epoll_tests():
+    """Only for the event-loop server: it must not be limited to N clients at once."""
+    print("event loop: many clients, slow readers")
+    # 4 event loops by default, so 300 open connections is far more than loops.
+    # A pool of 4 workers would answer only 4 of them.
+    many = [connect() for _ in range(300)]
+    for i, c in enumerate(many):
+        c.sendall(f"SET many{i} v{i}\n".encode())
+    answered = sum(1 for c in many if read_lines(c, 1) == ["OK"])
+    check("300 clients open at once all answered", answered, 300)
+    check("they share one table", ask(many[0], "GET many299"), "v299")
+    for c in many:
+        c.close()
+
+    # A client that asks for ~12 MB of replies and does not read them must not
+    # block anyone else, and must still get every byte once it does read.
+    slow = connect()
+    big = "z" * 60000
+    check("big value set", ask(slow, "SET bigz " + big), "OK")
+    count = 200
+    slow.sendall(b"GET bigz\n" * count)
+    time.sleep(0.5)  # let the server fill the socket and hit its buffering limit
+    other = connect()
+    check("others served while a client is not reading", ask(other, "GET many5"), "v5")
+    other.close()
+    want = count * (len(big) + 1)
+    got = 0
+    slow.settimeout(10)
+    while got < want:
+        chunk = slow.recv(1 << 16)
+        if not chunk:
+            break
+        got += len(chunk)
+    check("slow reader gets every byte", got, want)
+    slow.close()
+
+
 def run_tests():
     s = connect()
 
@@ -174,6 +211,9 @@ def run_tests():
         c.close()
     else:
         print("  (skipped in single mode)")
+
+    if "epoll" in sys.argv[2:]:
+        run_epoll_tests()
 
     print("reconnect")
     s.close()

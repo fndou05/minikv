@@ -17,7 +17,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 find_package(Threads REQUIRED)
 
 add_executable(minikv
-  src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp src/thread_pool.cpp src/log.cpp)
+  src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp src/thread_pool.cpp src/log.cpp
+  src/event_loop.cpp)
 target_compile_options(minikv PRIVATE -Wall -Wextra)
 target_link_libraries(minikv PRIVATE Threads::Threads)
 
@@ -30,7 +31,7 @@ target_compile_options(storage_stress PRIVATE -Wall -Wextra)
 target_include_directories(storage_stress PRIVATE src)
 target_link_libraries(storage_stress PRIVATE Threads::Threads)
 
-foreach(mode single thread pool)
+foreach(mode single thread pool epoll)
   add_test(NAME server_${mode}
            COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/test_server.py $<TARGET_FILE:minikv> ${mode})
 endforeach()

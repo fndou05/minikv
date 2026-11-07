@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <thread>
 
+#include "event_loop.h"
 #include "log.h"
 #include "server.h"
 #include "storage.h"
@@ -15,14 +16,17 @@
 
 static void usage() {
     std::fprintf(stderr,
-                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards] "
-                 "[log file] [fsync]\n");
+                 "usage: minikv [port] [single | thread | pool | epoll] [pool workers or event "
+                 "loops] [lock shards] [log file] [fsync]\n");
 }
 
 int main(int argc, char** argv) {
     int port = (argc > 1) ? std::atoi(argv[1]) : 7379;
     std::string mode = (argc > 2) ? argv[2] : "single";
-    size_t pool_workers = (argc > 3) ? static_cast<size_t>(std::atoi(argv[3])) : 16;
+    // Pool: worker threads (one per client being served). Epoll: event loop
+    // threads (each serves many clients), so far fewer are needed.
+    size_t workers_default = (mode == "epoll") ? 4 : 16;
+    size_t pool_workers = (argc > 3) ? static_cast<size_t>(std::atoi(argv[3])) : workers_default;
     size_t shards = (argc > 4) ? static_cast<size_t>(std::atoi(argv[4])) : 1;
     std::string log_path = (argc > 5) ? argv[5] : "";  // empty = no persistence
     std::string sync_arg = (argc > 6) ? argv[6] : "";  // "fsync" = fsync after every write
@@ -30,7 +34,7 @@ int main(int argc, char** argv) {
         usage();
         return 1;
     }
-    if (mode != "single" && mode != "thread" && mode != "pool") {
+    if (mode != "single" && mode != "thread" && mode != "pool" && mode != "epoll") {
         usage();
         return 1;
     }
@@ -64,9 +68,13 @@ int main(int argc, char** argv) {
     }
     std::printf("minikv listening on 127.0.0.1:%d (mode: %s, lock shards: %zu)\n", port,
                 mode.c_str(), shards);
+    if (mode == "epoll") {
+        std::printf("event loops: %zu (%s)\n", pool_workers, EventLoops::backend());
+    }
     std::fflush(stdout);
 
     ThreadPool pool(mode == "pool" ? pool_workers : 0, storage);
+    EventLoops loops(mode == "epoll" ? (pool_workers == 0 ? 1 : pool_workers) : 0, storage);
 
     while (true) {
         int client_fd = accept(listen_fd, nullptr, nullptr);
@@ -85,8 +93,10 @@ int main(int argc, char** argv) {
             // A new thread per connection; it cleans itself up when the
             // client disconnects.
             std::thread(serve_client, client_fd, std::ref(storage)).detach();
-        } else {
+        } else if (mode == "pool") {
             pool.add_client(client_fd);
+        } else {
+            loops.add_client(client_fd);
         }
     }
 }
