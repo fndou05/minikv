@@ -1,8 +1,15 @@
 #include "storage.h"
 
 #include <functional>
+#include <unistd.h>  // fsync
 
 Storage::Storage(size_t shards) : shards_(shards == 0 ? 1 : shards) {}
+
+Storage::~Storage() {
+    if (log_) {
+        std::fclose(log_);
+    }
+}
 
 Storage::Shard& Storage::shard_for(const std::string& key) const {
     return shards_[std::hash<std::string>{}(key) % shards_.size()];
@@ -38,19 +45,27 @@ bool Storage::remove(const std::string& key) {
     return existed;
 }
 
-bool Storage::enable_log(const std::string& path) {
+bool Storage::enable_log(const std::string& path, bool sync) {
     std::lock_guard<std::mutex> lock(log_mutex_);
-    log_.open(path, std::ios::app | std::ios::binary);
-    return log_.is_open();
+    log_ = std::fopen(path.c_str(), "ab");  // "a": every write goes to the end of the file
+    log_sync_ = sync;
+    return log_ != nullptr;
 }
 
 void Storage::append_log(const std::string& line) {
     std::lock_guard<std::mutex> lock(log_mutex_);
-    if (!log_.is_open()) {
+    if (!log_) {
         return;
     }
-    log_ << line << '\n';
+    std::fwrite(line.data(), 1, line.size(), log_);
+    std::fputc('\n', log_);
     // Hand the bytes to the OS right away, so a crash of this process doesn't
-    // lose them. (No fsync, so a power cut or OS crash still can.)
-    log_.flush();
+    // lose them.
+    std::fflush(log_);
+    if (log_sync_) {
+        // Ask the OS to push them to the disk itself, so even a power cut
+        // can't lose them. Much slower: this waits for the disk. (On macOS,
+        // fsync only reaches the drive's cache; F_FULLFSYNC goes further.)
+        fsync(fileno(log_));
+    }
 }

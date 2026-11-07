@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -14,7 +15,8 @@
 
 static void usage() {
     std::fprintf(stderr,
-                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file]\n");
+                 "usage: minikv [port] [single | thread | pool] [pool workers] [lock shards] "
+                 "[log file] [fsync]\n");
 }
 
 int main(int argc, char** argv) {
@@ -23,6 +25,11 @@ int main(int argc, char** argv) {
     size_t pool_workers = (argc > 3) ? static_cast<size_t>(std::atoi(argv[3])) : 16;
     size_t shards = (argc > 4) ? static_cast<size_t>(std::atoi(argv[4])) : 1;
     std::string log_path = (argc > 5) ? argv[5] : "";  // empty = no persistence
+    std::string sync_arg = (argc > 6) ? argv[6] : "";  // "fsync" = fsync after every write
+    if (sync_arg != "" && sync_arg != "fsync") {
+        usage();
+        return 1;
+    }
     if (mode != "single" && mode != "thread" && mode != "pool") {
         usage();
         return 1;
@@ -36,12 +43,17 @@ int main(int argc, char** argv) {
     Storage storage(shards);
     if (!log_path.empty()) {
         // Order matters: replay first (not logged), then start logging.
+        auto replay_start = std::chrono::steady_clock::now();
         size_t replayed = replay_log(log_path, storage);
-        if (!storage.enable_log(log_path)) {
+        double replay_ms = std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - replay_start)
+                               .count();
+        if (!storage.enable_log(log_path, sync_arg == "fsync")) {
             std::fprintf(stderr, "cannot open log file %s\n", log_path.c_str());
             return 1;
         }
-        std::printf("log: %s (replayed %zu commands)\n", log_path.c_str(), replayed);
+        std::printf("log: %s (replayed %zu commands in %.0f ms, %s)\n", log_path.c_str(), replayed,
+                    replay_ms, sync_arg == "fsync" ? "fsync on every write" : "flush only");
     }
 
     // Only start listening once the old data is loaded, so no client can see

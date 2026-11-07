@@ -1,6 +1,6 @@
 #pragma once
 
-#include <fstream>
+#include <cstdio>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -18,6 +18,7 @@
 class Storage {
 public:
     explicit Storage(size_t shards = 1);
+    ~Storage();  // closes the log file
 
     // Store the value. If the key already exists, overwrite it.
     void set(const std::string& key, const std::string& value);
@@ -33,7 +34,11 @@ public:
     // From now on, append every change to this file (the append-only log).
     // Call it AFTER replaying the old log, and before serving clients.
     // Returns false if the file can't be opened.
-    bool enable_log(const std::string& path);
+    // sync = true also calls fsync after every write, so each change is on
+    // disk before the client gets its reply (slower). With sync = false the
+    // bytes only reach the OS, which survives this process dying but not a
+    // power cut.
+    bool enable_log(const std::string& path, bool sync = false);
 
 private:
     // Write one line to the log, if logging is on. Called while the key's
@@ -55,5 +60,6 @@ private:
 
     // One log file shared by all shards, so writing to it needs its own lock.
     std::mutex log_mutex_;
-    std::ofstream log_;
+    std::FILE* log_ = nullptr;  // nullptr = logging is off
+    bool log_sync_ = false;
 };

@@ -51,14 +51,14 @@ def start_server(binary, extra):
     return proc
 
 
-def run_persistence_tests(binary):
+def run_persistence_tests(binary, fsync=False):
     import os
     import signal
     import tempfile
 
-    print("persistence (append-only log)")
+    print("persistence (append-only log" + (", fsync on every write)" if fsync else ")"))
     log = os.path.join(tempfile.mkdtemp(), "minikv.log")
-    args = ["pool", "4", "4", log]  # mode, workers, shards, log file
+    args = ["pool", "4", "4", log] + (["fsync"] if fsync else [])  # mode, workers, shards, log file
 
     # First life: write some data, then kill -9 (no clean shutdown).
     server = start_server(binary, args)
@@ -217,5 +217,6 @@ if __name__ == "__main__":
         server.terminate()
         server.wait()
     run_persistence_tests(binary)
+    run_persistence_tests(binary, fsync=True)
     print("FAILED" if failures else "ALL PASSED", f"({failures} failures)")
     sys.exit(1 if failures else 0)
