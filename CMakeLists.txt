@@ -14,5 +14,5 @@ endif()
 # Release gets exactly -O2 (CMake's default would be -O3 -DNDEBUG).
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
-add_executable(minikv src/main.cpp src/storage.cpp src/protocol.cpp)
+add_executable(minikv src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp)
 target_compile_options(minikv PRIVATE -Wall -Wextra)
