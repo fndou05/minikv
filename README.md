@@ -8,9 +8,11 @@ This is a work in progress
 
 ## Status
 
-Stage 1 works: a single-threaded server that handles one client at a time and
-supports SET, GET, and DELETE. Everything below this line that isn't described
-in the sections further down is still planned.
+Stages 1 and 2 work: the server supports SET, GET, and DELETE and can serve
+many clients at once in either a thread-per-connection mode or a fixed thread
+pool. **The storage is not thread-safe yet** (no locking until stage 3), so
+don't run concurrent writers against this version. Anything not described in the
+sections below is still planned.
 
 ## Plan
 
@@ -48,8 +50,14 @@ build type is Release (`-O2`).
 ```
 cmake -S . -B build
 cmake --build build
-./build/minikv 7379
+./build/minikv 7379 [single | thread | pool [workers]]
 ```
+
+- `single`: one client at a time (default)
+- `thread`: a new thread for every connection
+- `pool`: a fixed pool of worker threads (16 by default). Each worker serves one
+  client until it disconnects, so with N workers only N clients are served at
+  once and the rest wait.
 
 The server listens on `127.0.0.1` only (there's no authentication). Try it with
 `nc 127.0.0.1 7379` and type commands.
@@ -60,7 +68,7 @@ The server listens on `127.0.0.1` only (there's no authentication). Try it with
 including a command split across sends and many commands in one send.
 
 ```
-python3 tests/test_server.py build/minikv
+python3 tests/test_server.py build/minikv [single | thread | pool]
 ```
 
 ## Layout
@@ -68,7 +76,8 @@ python3 tests/test_server.py build/minikv
 - `src/storage.*`: the key-value table (an `unordered_map` behind `set`/`get`/`remove`)
 - `src/protocol.*`: turns one command line into a reply
 - `src/server.*`: sockets, buffering partial reads, sending replies
-- `src/main.cpp`: accept loop
+- `src/thread_pool.*`: fixed worker threads fed by a queue of client sockets
+- `src/main.cpp`: accept loop and mode selection
 
 ## Benchmarks
 
