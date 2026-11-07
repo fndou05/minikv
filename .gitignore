@@ -66,3 +66,14 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+*~
+
+# minikv data files (append-only log, stage 4)
+*.aof
+*.db
+data/
