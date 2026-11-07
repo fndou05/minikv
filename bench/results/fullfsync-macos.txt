@@ -1,0 +1,13 @@
+# one-off: same as fsync run but the server was built with fcntl(F_FULLFSYNC) instead of fsync() (macOS: forces the drive to flush its own cache). Not part of the committed code.
+# pool (16 workers), 64 shards, clients=16, 10s per run, 3 runs
+# 2026-11-06 22:41  base commit d208005
+# Apple M2 Pro, 12 cores, Darwin 23.6.0; Apple clang version 16.0.0 (clang-1600.0.26.6); -O2 -Wall -Wextra, C++17
+## run=1 log=F_FULLFSYNC
+clients=16 requests=25527 errors=0 seconds=10.03
+requests/sec=2544  latency_us p50=79.2 p99=40079.5 max=84859.0
+## run=2 log=F_FULLFSYNC
+clients=16 requests=28453 errors=0 seconds=10.02
+requests/sec=2839  latency_us p50=76.0 p99=35952.8 max=67770.2
+## run=3 log=F_FULLFSYNC
+clients=16 requests=31256 errors=0 seconds=10.01
+requests/sec=3122  latency_us p50=74.6 p99=31922.7 max=66715.9

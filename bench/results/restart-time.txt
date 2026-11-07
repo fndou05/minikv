@@ -1,0 +1,5 @@
+# restart time: replaying an existing log on startup. Log made by the benchmark (10,000 prefill SETs + 20% SETs of a 10s run); each run copies the file first.
+# 2026-11-06 22:47  commit d208005  Apple M2 Pro, Darwin 23.6.0
+log: /private/tmp/claude-501/-Users-ndou--claude-spares-spare-ohv19t/b0ec0a84-23ea-4fce-be6e-15eae89c8aff/scratchpad/replay.aof (replayed 467306 commands in 326 ms, flush only)
+log: /private/tmp/claude-501/-Users-ndou--claude-spares-spare-ohv19t/b0ec0a84-23ea-4fce-be6e-15eae89c8aff/scratchpad/replay.aof (replayed 467306 commands in 307 ms, flush only)
+log: /private/tmp/claude-501/-Users-ndou--claude-spares-spare-ohv19t/b0ec0a84-23ea-4fce-be6e-15eae89c8aff/scratchpad/replay.aof (replayed 467306 commands in 306 ms, flush only)

@@ -1,0 +1,4 @@
+# 2026-11-06 22:47  commit d208005  Darwin 23.6.0
+pool with 4 workers, 8 clients connected at once
+  replied within 2s: 4 of 8  (clients [0, 1, 2, 3])
+  after the served clients disconnect, the waiting ones got replies: 4 of 4

@@ -1,0 +1,66 @@
+# scaling-thread-64-shards  2026-11-06 22:43  commit d208005
+# Apple M2 Pro, 12 cores, Darwin 23.6.0
+# Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## mode=thread clients=1 run=1
+clients=1 requests=731443 errors=0 seconds=10.00
+requests/sec=73144  latency_us p50=13.3 p99=21.2 max=403.4
+## mode=thread clients=1 run=2
+clients=1 requests=739184 errors=0 seconds=10.00
+requests/sec=73918  latency_us p50=13.1 p99=21.0 max=572.2
+## mode=thread clients=1 run=3
+clients=1 requests=738101 errors=0 seconds=10.00
+requests/sec=73810  latency_us p50=13.1 p99=21.2 max=310.5
+## mode=thread clients=2 run=1
+clients=2 requests=1228461 errors=0 seconds=10.00
+requests/sec=122846  latency_us p50=15.8 p99=26.8 max=122.7
+## mode=thread clients=2 run=2
+clients=2 requests=1223120 errors=0 seconds=10.00
+requests/sec=122312  latency_us p50=15.9 p99=27.1 max=1669.0
+## mode=thread clients=2 run=3
+clients=2 requests=1220769 errors=0 seconds=10.00
+requests/sec=122077  latency_us p50=15.9 p99=27.2 max=1693.5
+## mode=thread clients=4 run=1
+clients=4 requests=2312865 errors=0 seconds=10.00
+requests/sec=231286  latency_us p50=13.8 p99=40.8 max=215.4
+## mode=thread clients=4 run=2
+clients=4 requests=1830516 errors=0 seconds=10.00
+requests/sec=183051  latency_us p50=16.8 p99=44.0 max=281.8
+## mode=thread clients=4 run=3
+clients=4 requests=1835590 errors=0 seconds=10.00
+requests/sec=183558  latency_us p50=16.6 p99=44.1 max=1164.5
+## mode=thread clients=8 run=1
+clients=8 requests=2563832 errors=0 seconds=10.00
+requests/sec=256381  latency_us p50=24.9 p99=67.1 max=1929.3
+## mode=thread clients=8 run=2
+clients=8 requests=2193297 errors=0 seconds=10.00
+requests/sec=219326  latency_us p50=27.4 p99=72.0 max=653.2
+## mode=thread clients=8 run=3
+clients=8 requests=2360127 errors=0 seconds=10.00
+requests/sec=236011  latency_us p50=25.5 p99=70.6 max=3347.0
+## mode=thread clients=16 run=1
+clients=16 requests=2607990 errors=0 seconds=10.00
+requests/sec=260796  latency_us p50=47.9 p99=125.4 max=28168.1
+## mode=thread clients=16 run=2
+clients=16 requests=2598201 errors=0 seconds=10.00
+requests/sec=259817  latency_us p50=41.6 p99=131.8 max=40629.2
+## mode=thread clients=16 run=3
+clients=16 requests=2336084 errors=0 seconds=10.00
+requests/sec=233606  latency_us p50=49.0 p99=128.1 max=36225.9
+## mode=thread clients=32 run=1
+clients=32 requests=2102004 errors=0 seconds=10.00
+requests/sec=210193  latency_us p50=179.5 p99=251.5 max=90887.5
+## mode=thread clients=32 run=2
+clients=32 requests=1568241 errors=0 seconds=10.00
+requests/sec=156821  latency_us p50=199.9 p99=651.5 max=91001.0
+## mode=thread clients=32 run=3
+clients=32 requests=2061516 errors=0 seconds=10.00
+requests/sec=206147  latency_us p50=101.5 p99=494.5 max=181645.9
+## mode=thread clients=64 run=1
+clients=64 requests=1815412 errors=0 seconds=10.00
+requests/sec=181532  latency_us p50=387.8 p99=1091.2 max=168429.8
+## mode=thread clients=64 run=2
+clients=64 requests=2271436 errors=0 seconds=10.00
+requests/sec=227134  latency_us p50=198.9 p99=573.8 max=233681.0
+## mode=thread clients=64 run=3
+clients=64 requests=1630677 errors=0 seconds=10.00
+requests/sec=163060  latency_us p50=402.8 p99=497.3 max=2897.5
