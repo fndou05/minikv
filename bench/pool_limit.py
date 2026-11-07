@@ -5,7 +5,10 @@ Starts the server in pool mode with 4 workers, opens 8 connections at once, and
 sends each one a command. Reports which connections got a reply within 2 seconds,
 then closes the served ones and checks that the waiting ones finally get served.
 
-usage: python3 bench/pool_limit.py build/minikv
+usage: python3 bench/pool_limit.py build/minikv [pool | epoll]
+
+With "epoll" the same 4 threads are event loops instead of pool workers, and all
+8 clients should be served at once.
 """
 import socket
 import subprocess
@@ -25,7 +28,8 @@ def got_reply(sock, timeout):
         return False
 
 
-server = subprocess.Popen([sys.argv[1], str(PORT), "pool", str(WORKERS)], stdout=subprocess.PIPE)
+MODE = sys.argv[2] if len(sys.argv) > 2 else "pool"
+server = subprocess.Popen([sys.argv[1], str(PORT), MODE, str(WORKERS)], stdout=subprocess.PIPE)
 for line in server.stdout:
     if b"listening" in line:
         break
@@ -38,7 +42,7 @@ try:
         socks.append(s)
 
     served = [got_reply(s, 2.0) for s in socks]
-    print(f"pool with {WORKERS} workers, {CLIENTS} clients connected at once")
+    print(f"{MODE} with {WORKERS} threads, {CLIENTS} clients connected at once")
     print(f"  replied within 2s: {sum(served)} of {CLIENTS}  (clients {[i for i, ok in enumerate(served) if ok]})")
 
     # Free the workers by disconnecting the served clients.

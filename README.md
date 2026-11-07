@@ -11,7 +11,8 @@ persistence work. Only the standard library and POSIX are used.
 Version 1.1.0. All four stages are built, tested, and benchmarked:
 
 1. Single-threaded TCP server (SET / GET / DELETE)
-2. Many clients at once: thread-per-connection or a fixed thread pool
+2. Many clients at once: thread-per-connection, a fixed thread pool, or an
+   event loop (epoll on Linux, kqueue on macOS)
 3. Thread-safe storage: a mutex per shard (1 shard = one global lock)
 4. Persistence: an append-only log that is replayed on startup
 
@@ -19,15 +20,15 @@ Tested on Linux (Ubuntu, with both g++ and clang++) by GitHub Actions on every
 push, and on macOS (Apple Silicon) by hand. The benchmark numbers below are from
 the Mac only; I haven't benchmarked on Linux.
 
-Not built: key expiration, epoll, group commit, and log compaction (see "Limitations").
+Not built: key expiration, group commit, and log compaction (see "Limitations").
 
 ## How it works
 
 ```
  client ──TCP──▶ accept loop (main.cpp)
-                   │  single: serve inline │ thread: new thread │ pool: queue ─▶ workers
+                   │  single: inline │ thread: new thread │ pool: queue ─▶ workers │ epoll: event loops
                    ▼
-              serve_client (server.cpp)
+   serve_client (server.cpp)  or  event loops (event_loop.cpp)
                  recv ─▶ buffer ─▶ split on '\n' ─▶ handle_command (protocol.cpp)
                                                           │
                                                           ▼
@@ -61,8 +62,12 @@ Design decisions:
 
 - In `pool` mode a worker serves one client until it disconnects, so with N
   workers only N clients are served at once. Thread-per-connection has no such
-  limit but creates a thread per client. Fixing this properly means an event
-  loop (epoll), which I haven't built.
+  limit but creates a thread per client. `epoll` mode fixes both: a few threads
+  watch all the sockets. Its weak spot is that a loop thread does the storage
+  work itself, so a slow `fsync` stalls every client on that loop.
+- `epoll` mode is level-triggered and has no timeouts: a client that connects
+  and never reads its replies keeps its connection (and buffered replies) until
+  it disconnects.
 - Every `fsync` waits for the disk while holding the log lock, so durable writes
   are serialized. Real databases batch several writes into one `fsync` (group
   commit); I haven't. The log also never shrinks.
@@ -94,7 +99,7 @@ build type is Release (`-O2`).
 ```
 cmake -S . -B build
 cmake --build build
-./build/minikv [port] [single | thread | pool] [pool workers] [lock shards] [log file] [fsync]
+./build/minikv [port] [single | thread | pool | epoll] [pool workers or event loops] [lock shards] [log file] [fsync]
 ```
 
 - `single`: one client at a time (default)
@@ -102,6 +107,13 @@ cmake --build build
 - `pool`: a fixed pool of worker threads (16 by default). Each worker serves one
   client until it disconnects, so with N workers only N clients are served at
   once and the rest wait.
+- `epoll`: a few event-loop threads (4 by default, set with the 3rd argument),
+  each watching many sockets at once with epoll on Linux or kqueue on macOS
+  (macOS has no epoll). Sockets are non-blocking; a thread only touches a
+  socket when the OS says it's ready, so thousands of idle clients are cheap
+  and there is no limit of N clients at once. Replies that don't fit in the
+  socket's send buffer are kept and sent later, and a client that isn't reading
+  its replies is paused instead of making the server buffer without limit.
 
 `lock shards` (default 1) splits the table into that many pieces, each with its
 own mutex. A key always maps to the same piece, so threads only wait on each
@@ -156,7 +168,7 @@ The same suite runs on Ubuntu in CI (`.github/workflows/ci.yml`), plus a
 ThreadSanitizer run of the stress test.
 
 ```
-python3 tests/test_server.py build/minikv [single | thread | pool]
+python3 tests/test_server.py build/minikv [single | thread | pool | epoll]
 ```
 
 `tests/storage_stress.cpp` hammers `Storage` from 8 threads. I built it with
@@ -174,6 +186,7 @@ c++ -std=c++17 -g -fsanitize=thread -Isrc tests/storage_stress.cpp src/storage.c
 - `src/protocol.*`: turns one command line into a reply
 - `src/server.*`: sockets, buffering partial reads, sending replies
 - `src/thread_pool.*`: fixed worker threads fed by a queue of client sockets
+- `src/event_loop.*`: epoll/kqueue event loops with non-blocking sockets
 - `src/log.*`: replays the append-only log on startup
 - `src/main.cpp`: accept loop and mode selection
 - `bench/`: load generator (`bench.cpp`), run script, and raw results
@@ -289,3 +302,25 @@ keys, lots of overwrites) took 306 to 326 ms over 3 runs.
 with a 4-worker pool and 8 clients connected at once, 4 clients got replies
 within 2 seconds and 4 did not. Once the first 4 disconnected, the other 4 were
 served. That's the blocking-I/O limit described under Limitations.
+
+**Event loop vs thread-per-connection** (`epoll` mode here means 4 kqueue loops
+on this Mac; 64 lock shards; medians of 3 runs of 10 s; raw output in
+`bench/results/epoll-vs-thread.txt`):
+
+| Clients | epoll (4 loops) req/s | thread req/s |
+|---|---|---|
+| 16 | 252,164 | 235,297 |
+| 64 | 184,075 | 201,553 |
+| 256 | 172,240 | 196,487 |
+
+The event loop is not faster. At 16 clients the two overlap, and at 256 the
+thread-per-connection server was about 14% ahead in all three runs. I didn't
+investigate why (the load generator shares the same 12 cores, and I haven't
+profiled). What the event loop buys is the behaviour, not speed: 4 threads serve
+any number of clients, where the pool serves only N at once and
+thread-per-connection needs one thread per client. Linux epoll itself is only
+exercised by the tests in CI, not benchmarked.
+
+**The pool limit vs the event loop** (`python3 bench/pool_limit.py build/minikv
+epoll`): with 4 threads and 8 clients connected at once, the pool answered 4 of
+8 within 2 seconds, and the event loop answered all 8 (`bench/results/epoll-limit.txt`).

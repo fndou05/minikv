@@ -1,0 +1,57 @@
+# epoll-vs-thread-64-shards  2026-11-07 10:57  commit ef8eeac
+# Apple M2 Pro, 12 cores, Darwin 23.6.0
+# Apple clang version 16.0.0 (clang-1600.0.26.6); built with CMake Release: -O2 -Wall -Wextra, C++17
+## mode=epoll clients=16 run=1
+clients=16 requests=2521675 errors=0 seconds=10.00
+requests/sec=252164  latency_us p50=47.1 p99=130.9 max=125017.9
+## mode=epoll clients=16 run=2
+clients=16 requests=2703224 errors=0 seconds=10.00
+requests/sec=270319  latency_us p50=45.3 p99=133.2 max=70732.2
+## mode=epoll clients=16 run=3
+clients=16 requests=2383181 errors=0 seconds=10.00
+requests/sec=238315  latency_us p50=50.8 p99=127.1 max=68717.0
+## mode=thread clients=16 run=1
+clients=16 requests=2352990 errors=0 seconds=10.00
+requests/sec=235297  latency_us p50=47.3 p99=143.8 max=174976.3
+## mode=thread clients=16 run=2
+clients=16 requests=2586588 errors=0 seconds=10.00
+requests/sec=258655  latency_us p50=28.4 p99=150.0 max=125044.0
+## mode=thread clients=16 run=3
+clients=16 requests=2222780 errors=0 seconds=10.00
+requests/sec=222274  latency_us p50=48.7 p99=214.4 max=70865.8
+## mode=epoll clients=64 run=1
+clients=64 requests=1808896 errors=0 seconds=10.00
+requests/sec=180878  latency_us p50=366.5 p99=536.3 max=21973.9
+## mode=epoll clients=64 run=2
+clients=64 requests=1840827 errors=0 seconds=10.00
+requests/sec=184075  latency_us p50=364.6 p99=477.6 max=21536.2
+## mode=epoll clients=64 run=3
+clients=64 requests=2071454 errors=0 seconds=10.00
+requests/sec=207136  latency_us p50=358.2 p99=487.0 max=126456.6
+## mode=thread clients=64 run=1
+clients=64 requests=1661175 errors=0 seconds=10.00
+requests/sec=166111  latency_us p50=402.0 p99=533.5 max=180006.3
+## mode=thread clients=64 run=2
+clients=64 requests=2286889 errors=0 seconds=10.00
+requests/sec=228677  latency_us p50=194.4 p99=523.0 max=250533.0
+## mode=thread clients=64 run=3
+clients=64 requests=2015627 errors=0 seconds=10.00
+requests/sec=201553  latency_us p50=381.6 p99=530.2 max=220348.5
+## mode=epoll clients=256 run=1
+clients=256 requests=1719027 errors=0 seconds=10.00
+requests/sec=171860  latency_us p50=1461.6 p99=1903.8 max=7052.3
+## mode=epoll clients=256 run=2
+clients=256 requests=1722781 errors=0 seconds=10.00
+requests/sec=172240  latency_us p50=1461.7 p99=1901.1 max=6681.7
+## mode=epoll clients=256 run=3
+clients=256 requests=1733927 errors=0 seconds=10.00
+requests/sec=173340  latency_us p50=1456.5 p99=1903.0 max=6834.5
+## mode=thread clients=256 run=1
+clients=256 requests=2128934 errors=0 seconds=10.00
+requests/sec=212843  latency_us p50=1034.2 p99=2039.2 max=294696.2
+## mode=thread clients=256 run=2
+clients=256 requests=1949198 errors=0 seconds=10.00
+requests/sec=194877  latency_us p50=1578.9 p99=2304.4 max=328958.9
+## mode=thread clients=256 run=3
+clients=256 requests=1965285 errors=0 seconds=10.00
+requests/sec=196487  latency_us p50=1567.4 p99=2570.5 max=315354.5

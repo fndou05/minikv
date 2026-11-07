@@ -5,7 +5,8 @@
 #
 # Set SHARDS=n to choose the number of lock shards (default 1 = one global lock).
 # Each configuration gets a fresh server and 3 runs of 10 seconds.
-# The pool always has 16 workers so that 16 clients all get served at once.
+# WORKERS=n sets pool workers / epoll event loops (default 16, so that 16
+# clients all get served at once by the pool).
 set -u
 cd "$(dirname "$0")/.."
 LABEL=$1
@@ -21,7 +22,7 @@ echo "# $(c++ --version | head -1); built with CMake Release: -O2 -Wall -Wextra,
 for config in $CONFIGS; do
     mode=${config%%:*}
     clients=${config##*:}
-    ./build/minikv $PORT $mode 16 ${SHARDS:-1} >/dev/null &
+    ./build/minikv $PORT $mode ${WORKERS:-16} ${SHARDS:-1} >/dev/null &
     server=$!
     sleep 0.5
     for run in $(seq $RUNS); do
