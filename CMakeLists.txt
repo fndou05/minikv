@@ -20,3 +20,8 @@ add_executable(minikv
   src/main.cpp src/storage.cpp src/protocol.cpp src/server.cpp src/thread_pool.cpp)
 target_compile_options(minikv PRIVATE -Wall -Wextra)
 target_link_libraries(minikv PRIVATE Threads::Threads)
+
+# Load generator used for the benchmark numbers in the README.
+add_executable(bench bench/bench.cpp)
+target_compile_options(bench PRIVATE -Wall -Wextra)
+target_link_libraries(bench PRIVATE Threads::Threads)
